@@ -5,12 +5,16 @@ function [fvalbest,xposbest,Curve] = MSFOA(N, T, lb, ub, D, fobj)
     %   N: Population size
     %   T: Maximum iterations
     %   D: Problem dimension
-    %   fobj: Objective function (assumed O(D) per evaluation)
-
+    %   fobj: Objective function (assumed O(D) per evaluation
+    tic
     %% Initialization
     GP = 0.5;     % Exploration/exploitation parameter 
     k = round(0.05 * N); % Number of worst individuals to reverse
     p_reverse = 0.2; % Probability of reverse learning for others
+    decay_factor=-0.0693;
+    decay_bias=0.5;
+    phfactor_exploration=2.0;
+    phfactor_exploitation=0.8;
     if size(ub, 2) == 1
         lb = lb * ones(1, D); 
         ub = ub * ones(1, D);
@@ -30,8 +34,8 @@ function [fvalbest,xposbest,Curve] = MSFOA(N, T, lb, ub, D, fobj)
     for t = 1:T
         % Angle calculation (random fluctuation)
         base_amplitude = pi / 2;
-        decay_factor = 1 - (t / T);
-        theta = base_amplitude * decay_factor * (2 * rand() - 1); 
+        theta_decay_factor = 1 - (t / T);
+        theta = base_amplitude * theta_decay_factor * (2 * rand() - 1); 
         theta = max(min(theta, pi), 0);
         tEO = (T - t) / T * cos(theta);
 
@@ -44,7 +48,7 @@ function [fvalbest,xposbest,Curve] = MSFOA(N, T, lb, ub, D, fobj)
                         pm = (2 * rand - 1) * pi;
                         % Compute distance on-demand: Dist(i, order) = norm(Xpos(i,:) - xposbest)
                         dist_i_order = norm(Xpos(i, :) - xposbest);
-                        phi = 2.0 * exp(-0.0693 * dist_i_order) + 0.5;
+                        phi = phfactor_exploration * exp(decay_factor * dist_i_order) + decay_bias;
                         origin_X = newX(i, jp1(j));
                         if rand < GP
                             newX(i, jp1(j)) = Xpos(i, jp1(j)) + phi * pm * (xposbest(jp1(j)) - Xpos(i, jp1(j))) * cos(theta);
@@ -70,8 +74,8 @@ function [fvalbest,xposbest,Curve] = MSFOA(N, T, lb, ub, D, fobj)
                     % Compute distances on-demand: Dist(i, im(1)) and Dist(i, im(2))
                     dist_i_im1 = norm(Xpos(i, :) - Xpos(im(1), :));
                     dist_i_im2 = norm(Xpos(i, :) - Xpos(im(2), :));
-                    phi1 = 0.8 * exp(-0.0693 * dist_i_im1) + 0.5;
-                    phi2 = 0.8 * exp(-0.0693 * dist_i_im2) + 0.5;
+                    phi1 =phfactor_exploitation * exp(decay_factor * dist_i_im1) + decay_bias;
+                    phi2 = phfactor_exploitation * exp(decay_factor * dist_i_im2) + decay_bias;
                     rand1 = 2 * rand - 1;
                     rand2 = 2 * rand - 1;
                     origin_X = newX(i, jp2);
@@ -103,8 +107,8 @@ function [fvalbest,xposbest,Curve] = MSFOA(N, T, lb, ub, D, fobj)
                 % Compute distances on-demand: Dist(i, df(kp(1))) and Dist(i, df(kp(2)))
                 dist_i_kp1 = norm(Xpos(i, :) - Xpos(df(kp(1)), :));
                 dist_i_kp2 = norm(Xpos(i, :) - Xpos(df(kp(2)), :));
-                phi1 = 0.8 * exp(-0.0693 * dist_i_kp1) + 0.5;
-                phi2 = 0.8 * exp(-0.0693 * dist_i_kp2) + 0.5;
+                phi1 = phfactor_exploitation * exp(decay_factor * dist_i_kp1) + decay_bias;
+                phi2 = phfactor_exploitation * exp(decay_factor * dist_i_kp2) + decay_bias;
                 newX(i, :) = Xpos(i, :) + phi1 * r1 * dm(kp(1), :) + phi2 * r2 * dm(kp(2), :);
                 if i == N % Regeneration for last individual
                     newX(i, :) = exp(-t * N / T) .* Xpos(i, :);
@@ -160,4 +164,5 @@ function [fvalbest,xposbest,Curve] = MSFOA(N, T, lb, ub, D, fobj)
         end
         Curve(t) = fvalbest;
     end
+    toc
 end
